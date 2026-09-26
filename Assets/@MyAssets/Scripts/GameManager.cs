@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.UI;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
@@ -12,6 +13,12 @@ public class GameManager : MonoBehaviour
     public TextMeshProUGUI textoTiempo;
     public TextMeshProUGUI textoInstrucciones;
     public GameObject botonStart;
+
+    [Header("Minimapa UI")]
+    [Tooltip("Arrastra aquí las 9 casillas del minimapa en el mismo orden que 'todosLosPlatos'")]
+    public Image[] casillasMinimapa;
+    public Color colorCasillaInactiva = new Color(1f, 1f, 1f, 0.15f); // Blanca semitransparente / apagada
+    public Color colorCasillaActiva = new Color(0.18f, 0.8f, 0.44f, 1f); // Verde brillante
 
     [Header("Configuración de Tiempos")]
     public float tiempoFase1 = 60f;
@@ -71,7 +78,7 @@ public class GameManager : MonoBehaviour
         {
             objetosNecesariosFase = 3;
             tiempoRestante = tiempoFase1;
-            textoInstrucciones.text = "Fase 1: Coloca 3 objetos en los altares activos.";
+            textoInstrucciones.text = "Fase 1: Coloca 3 objetos en los altares activos marcados.";
             PrepararPlatosAleatorios(3);
             OnFase1Start?.Invoke();
         }
@@ -101,7 +108,7 @@ public class GameManager : MonoBehaviour
 
     private void PrepararPlatosAleatorios(int cantidad)
     {
-        // 1. Apagar todos los pedestales
+        // 1. Apagar todos los pedestales físicos
         foreach (var plato in todosLosPlatos)
         {
             if (plato != null)
@@ -110,7 +117,19 @@ public class GameManager : MonoBehaviour
             }
         }
 
-        // 2. Barajar la lista completa (Fisher-Yates)
+        // 2. Apagar/Atenuar todas las casillas del minimapa
+        if (casillasMinimapa != null)
+        {
+            foreach (var casilla in casillasMinimapa)
+            {
+                if (casilla != null)
+                {
+                    casilla.color = colorCasillaInactiva;
+                }
+            }
+        }
+
+        // 3. Barajar la lista completa (Fisher-Yates)
         List<GameObject> baraja = new List<GameObject>(todosLosPlatos);
         for (int i = baraja.Count - 1; i > 0; i--)
         {
@@ -120,7 +139,7 @@ public class GameManager : MonoBehaviour
             baraja[r] = temporal;
         }
 
-        // 3. Activar y registrar solo la cantidad necesaria
+        // 4. Activar la cantidad necesaria y pintar su casilla en el minimapa
         platosFaseActual.Clear();
         for (int i = 0; i < cantidad && i < baraja.Count; i++)
         {
@@ -128,7 +147,17 @@ public class GameManager : MonoBehaviour
             platoSeleccionado.SetActive(true);
             platosFaseActual.Add(platoSeleccionado);
 
-            // Conectar automáticamente los eventos de colocación para no hacerlo a mano
+            // Buscamos el índice original del plato para iluminar su casilla correspondiente
+            int indicePlato = todosLosPlatos.IndexOf(platoSeleccionado);
+            if (casillasMinimapa != null && indicePlato >= 0 && indicePlato < casillasMinimapa.Length)
+            {
+                if (casillasMinimapa[indicePlato] != null)
+                {
+                    casillasMinimapa[indicePlato].color = colorCasillaActiva;
+                }
+            }
+
+            // Conectar eventos dinámicamente
             XRSocketInteractor socket = platoSeleccionado.GetComponentInChildren<XRSocketInteractor>();
             if (socket != null)
             {
@@ -214,6 +243,15 @@ public class GameManager : MonoBehaviour
             botonStart.SetActive(true);
             faseActual = 0;
             LimpiarPlatosActivos();
+
+            // Apagar las casillas del minimapa
+            if (casillasMinimapa != null)
+            {
+                foreach (var casilla in casillasMinimapa)
+                {
+                    if (casilla != null) casilla.color = colorCasillaInactiva;
+                }
+            }
         }
     }
 }
