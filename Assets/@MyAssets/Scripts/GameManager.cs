@@ -15,10 +15,14 @@ public class GameManager : MonoBehaviour
     public GameObject botonStart;
 
     [Header("Minimapa UI")]
-    [Tooltip("Arrastra aquí las 9 casillas del minimapa en el mismo orden que 'todosLosPlatos'")]
     public Image[] casillasMinimapa;
-    public Color colorCasillaInactiva = new Color(1f, 1f, 1f, 0.15f); // Blanca semitransparente / apagada
-    public Color colorCasillaActiva = new Color(0.18f, 0.8f, 0.44f, 1f); // Verde brillante
+    public Color colorCasillaInactiva = new Color(1f, 1f, 1f, 0.15f);
+    public Color colorCasillaActiva = new Color(0.18f, 0.8f, 0.44f, 1f);
+
+    [Header("Efectos de Sonido")]
+    public AudioSource audioSource;
+    public AudioClip sonidoColocarObjeto;
+    public AudioClip sonidoFaseCompletada;
 
     [Header("Configuración de Tiempos")]
     public float tiempoFase1 = 60f;
@@ -26,7 +30,6 @@ public class GameManager : MonoBehaviour
     public float tiempoFase3 = 90f;
 
     [Header("Pool Total de Altares / Platos")]
-    [Tooltip("Arrastra aquí los 9 altares o platos de la escena")]
     public List<GameObject> todosLosPlatos;
 
     [Header("Eventos de Inicio de Fase")]
@@ -64,10 +67,15 @@ public class GameManager : MonoBehaviour
 
     private void AvanzarFase()
     {
-        // Limpiamos los objetos depositados y eventos de la fase anterior
         if (faseActual > 0)
         {
             LimpiarPlatosActivos();
+
+            // Sonido de éxito al superar la fase anterior
+            if (audioSource != null && sonidoFaseCompletada != null)
+            {
+                audioSource.PlayOneShot(sonidoFaseCompletada);
+            }
         }
 
         faseActual++;
@@ -100,7 +108,6 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            // Victoria: limpiamos la última ronda y cerramos el juego
             LimpiarPlatosActivos();
             TerminarJuego(true);
         }
@@ -108,28 +115,19 @@ public class GameManager : MonoBehaviour
 
     private void PrepararPlatosAleatorios(int cantidad)
     {
-        // 1. Apagar todos los pedestales físicos
         foreach (var plato in todosLosPlatos)
         {
-            if (plato != null)
-            {
-                plato.SetActive(false);
-            }
+            if (plato != null) plato.SetActive(false);
         }
 
-        // 2. Apagar/Atenuar todas las casillas del minimapa
         if (casillasMinimapa != null)
         {
             foreach (var casilla in casillasMinimapa)
             {
-                if (casilla != null)
-                {
-                    casilla.color = colorCasillaInactiva;
-                }
+                if (casilla != null) casilla.color = colorCasillaInactiva;
             }
         }
 
-        // 3. Barajar la lista completa (Fisher-Yates)
         List<GameObject> baraja = new List<GameObject>(todosLosPlatos);
         for (int i = baraja.Count - 1; i > 0; i--)
         {
@@ -139,7 +137,6 @@ public class GameManager : MonoBehaviour
             baraja[r] = temporal;
         }
 
-        // 4. Activar la cantidad necesaria y pintar su casilla en el minimapa
         platosFaseActual.Clear();
         for (int i = 0; i < cantidad && i < baraja.Count; i++)
         {
@@ -147,7 +144,6 @@ public class GameManager : MonoBehaviour
             platoSeleccionado.SetActive(true);
             platosFaseActual.Add(platoSeleccionado);
 
-            // Buscamos el índice original del plato para iluminar su casilla correspondiente
             int indicePlato = todosLosPlatos.IndexOf(platoSeleccionado);
             if (casillasMinimapa != null && indicePlato >= 0 && indicePlato < casillasMinimapa.Length)
             {
@@ -157,7 +153,6 @@ public class GameManager : MonoBehaviour
                 }
             }
 
-            // Conectar eventos dinámicamente
             XRSocketInteractor socket = platoSeleccionado.GetComponentInChildren<XRSocketInteractor>();
             if (socket != null)
             {
@@ -198,6 +193,12 @@ public class GameManager : MonoBehaviour
 
     private void OnSocketSelectEntered(SelectEnterEventArgs args)
     {
+        // Reproducir sonido al entrar en el socket
+        if (audioSource != null && sonidoColocarObjeto != null)
+        {
+            audioSource.PlayOneShot(sonidoColocarObjeto);
+        }
+
         RegistrarObjetoColocado();
     }
 
@@ -235,6 +236,10 @@ public class GameManager : MonoBehaviour
         {
             textoInstrucciones.text = "¡Misión completada! Has superado todas las fases.";
             textoTiempo.text = "¡Victoria!";
+            if (audioSource != null && sonidoFaseCompletada != null)
+            {
+                audioSource.PlayOneShot(sonidoFaseCompletada);
+            }
         }
         else
         {
@@ -244,7 +249,6 @@ public class GameManager : MonoBehaviour
             faseActual = 0;
             LimpiarPlatosActivos();
 
-            // Apagar las casillas del minimapa
             if (casillasMinimapa != null)
             {
                 foreach (var casilla in casillasMinimapa)
