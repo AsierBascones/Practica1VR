@@ -9,13 +9,20 @@ using UnityEngine.XR.Interaction.Toolkit.Interactors;
 
 public class GameManager : MonoBehaviour
 {
-    [Header("Interfaz UI")]
-    public TextMeshProUGUI textoTiempo;
-    public TextMeshProUGUI textoInstrucciones;
-    public GameObject botonStart;
+    [Header("Paneles UI - Isla del Juego")]
+    public TextMeshProUGUI textoTiempoJuego;
+    public TextMeshProUGUI textoInstruccionesJuego;
+    public GameObject botonStartJuego;
 
-    [Header("Minimapa UI")]
-    public Image[] casillasMinimapa;
+    [Header("Paneles UI - Lobby")]
+    public TextMeshProUGUI textoTiempoLobby;
+    public TextMeshProUGUI textoInstruccionesLobby;
+
+    [Header("Iconos Minimapa / Cuadrícula")]
+    [Tooltip("Iconos del panel en la isla")]
+    public Image[] casillasJuego;
+    [Tooltip("Iconos equivalentes del panel en el lobby (mismo orden)")]
+    public Image[] casillasLobby;
     public Color colorCasillaInactiva = new Color(1f, 1f, 1f, 0.15f);
     public Color colorCasillaActiva = new Color(0.18f, 0.8f, 0.44f, 1f);
 
@@ -49,7 +56,7 @@ public class GameManager : MonoBehaviour
         if (juegoActivo)
         {
             tiempoRestante -= Time.deltaTime;
-            textoTiempo.text = "Tiempo: " + Mathf.CeilToInt(tiempoRestante).ToString() + "s";
+            ActualizarTextoTiempo("Tiempo: " + Mathf.CeilToInt(tiempoRestante).ToString() + "s");
 
             if (tiempoRestante <= 0)
             {
@@ -60,7 +67,7 @@ public class GameManager : MonoBehaviour
 
     public void IniciarJuego()
     {
-        botonStart.SetActive(false);
+        SetBotonStartActivo(false);
         faseActual = 0;
         AvanzarFase();
     }
@@ -71,7 +78,6 @@ public class GameManager : MonoBehaviour
         {
             LimpiarPlatosActivos();
 
-            // Sonido de éxito al superar la fase anterior
             if (audioSource != null && sonidoFaseCompletada != null)
             {
                 audioSource.PlayOneShot(sonidoFaseCompletada);
@@ -86,7 +92,7 @@ public class GameManager : MonoBehaviour
         {
             objetosNecesariosFase = 3;
             tiempoRestante = tiempoFase1;
-            textoInstrucciones.text = "Fase 1: Coloca 3 objetos en los altares activos marcados.";
+            ActualizarTextoInstrucciones("Fase 1: Coloca 3 objetos en los altares activos marcados.");
             PrepararPlatosAleatorios(3);
             OnFase1Start?.Invoke();
         }
@@ -94,7 +100,7 @@ public class GameManager : MonoBehaviour
         {
             objetosNecesariosFase = 6;
             tiempoRestante = tiempoFase2;
-            textoInstrucciones.text = "Fase 2: ¡6 objetos! Usa el teletransporte a la otra isla.";
+            ActualizarTextoInstrucciones("Fase 2: ¡6 objetos! Usa el teletransporte a la otra isla.");
             PrepararPlatosAleatorios(6);
             OnFase2Start?.Invoke();
         }
@@ -102,7 +108,7 @@ public class GameManager : MonoBehaviour
         {
             objetosNecesariosFase = 9;
             tiempoRestante = tiempoFase3;
-            textoInstrucciones.text = "Fase 3: ¡Completa los 9 pedestales al completo!";
+            ActualizarTextoInstrucciones("Fase 3: ¡Completa los 9 pedestales al completo!");
             PrepararPlatosAleatorios(9);
             OnFase3Start?.Invoke();
         }
@@ -120,13 +126,7 @@ public class GameManager : MonoBehaviour
             if (plato != null) plato.SetActive(false);
         }
 
-        if (casillasMinimapa != null)
-        {
-            foreach (var casilla in casillasMinimapa)
-            {
-                if (casilla != null) casilla.color = colorCasillaInactiva;
-            }
-        }
+        ResetearCasillas();
 
         List<GameObject> baraja = new List<GameObject>(todosLosPlatos);
         for (int i = baraja.Count - 1; i > 0; i--)
@@ -145,13 +145,7 @@ public class GameManager : MonoBehaviour
             platosFaseActual.Add(platoSeleccionado);
 
             int indicePlato = todosLosPlatos.IndexOf(platoSeleccionado);
-            if (casillasMinimapa != null && indicePlato >= 0 && indicePlato < casillasMinimapa.Length)
-            {
-                if (casillasMinimapa[indicePlato] != null)
-                {
-                    casillasMinimapa[indicePlato].color = colorCasillaActiva;
-                }
-            }
+            ActualizarColorCasilla(indicePlato, colorCasillaActiva);
 
             XRSocketInteractor socket = platoSeleccionado.GetComponentInChildren<XRSocketInteractor>();
             if (socket != null)
@@ -193,7 +187,6 @@ public class GameManager : MonoBehaviour
 
     private void OnSocketSelectEntered(SelectEnterEventArgs args)
     {
-        // Reproducir sonido al entrar en el socket
         if (audioSource != null && sonidoColocarObjeto != null)
         {
             audioSource.PlayOneShot(sonidoColocarObjeto);
@@ -234,8 +227,8 @@ public class GameManager : MonoBehaviour
         juegoActivo = false;
         if (victoria)
         {
-            textoInstrucciones.text = "¡Misión completada! Has superado todas las fases.";
-            textoTiempo.text = "¡Victoria!";
+            ActualizarTextoInstrucciones("¡Misión completada! Has superado todas las fases.");
+            ActualizarTextoTiempo("¡Victoria!");
             if (audioSource != null && sonidoFaseCompletada != null)
             {
                 audioSource.PlayOneShot(sonidoFaseCompletada);
@@ -243,19 +236,63 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            textoInstrucciones.text = "¡Tiempo agotado! Pulsa Start para reintentar.";
-            textoTiempo.text = "Fin";
-            botonStart.SetActive(true);
+            ActualizarTextoInstrucciones("¡Tiempo agotado! Pulsa Start para reintentar.");
+            ActualizarTextoTiempo("Fin");
+            SetBotonStartActivo(true);
             faseActual = 0;
             LimpiarPlatosActivos();
+            ResetearCasillas();
+        }
+    }
 
-            if (casillasMinimapa != null)
+    // --- Métodos de sincronización dual ---
+
+    private void ActualizarTextoTiempo(string valor)
+    {
+        if (textoTiempoJuego != null) textoTiempoJuego.text = valor;
+        if (textoTiempoLobby != null) textoTiempoLobby.text = valor;
+    }
+
+    private void ActualizarTextoInstrucciones(string valor)
+    {
+        if (textoInstruccionesJuego != null) textoInstruccionesJuego.text = valor;
+        if (textoInstruccionesLobby != null) textoInstruccionesLobby.text = valor;
+    }
+
+    private void SetBotonStartActivo(bool estado)
+    {
+        if (botonStartJuego != null) botonStartJuego.SetActive(estado);
+    }
+
+    private void ResetearCasillas()
+    {
+        if (casillasJuego != null)
+        {
+            foreach (var c in casillasJuego)
             {
-                foreach (var casilla in casillasMinimapa)
-                {
-                    if (casilla != null) casilla.color = colorCasillaInactiva;
-                }
+                if (c != null) c.color = colorCasillaInactiva;
             }
+        }
+
+        if (casillasLobby != null)
+        {
+            foreach (var c in casillasLobby)
+            {
+                if (c != null) c.color = colorCasillaInactiva;
+            }
+        }
+    }
+
+    private void ActualizarColorCasilla(int indice, Color nuevoColor)
+    {
+        if (casillasJuego != null && indice >= 0 && indice < casillasJuego.Length)
+        {
+            if (casillasJuego[indice] != null) casillasJuego[indice].color = nuevoColor;
+        }
+
+        if (casillasLobby != null && indice >= 0 && indice < casillasLobby.Length)
+        {
+            if (casillasLobby[indice] != null) casillasLobby[indice].color = nuevoColor;
         }
     }
 }
