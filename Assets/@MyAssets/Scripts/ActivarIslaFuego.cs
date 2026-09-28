@@ -7,6 +7,10 @@ public class ActivarIslaFuego : MonoBehaviour
     [Tooltip("El GameObject hijo con el ParticleSystem o luces del fuego")]
     public GameObject fuegoEfecto;
 
+    [Header("Muro del Amarradero")]
+    [Tooltip("El muro que bloquea el paso hacia el muelle/amarradero")]
+    public GameObject muroAmarradero;
+
     [Header("Configuración de la Isla")]
     [Tooltip("La raíz del GameObject de la isla que emergerá")]
     public Transform islaEmergente;
@@ -23,8 +27,9 @@ public class ActivarIslaFuego : MonoBehaviour
 
     void Start()
     {
-        // Estado inicial: fuego apagado y la isla bajo el agua
+        // Estado inicial
         if (fuegoEfecto != null) fuegoEfecto.SetActive(false);
+        if (muroAmarradero != null) muroAmarradero.SetActive(true);
 
         if (islaEmergente != null)
         {
@@ -34,21 +39,28 @@ public class ActivarIslaFuego : MonoBehaviour
         }
     }
 
-    // Vincular al evento 'Activated' o 'First Select Entered' del XR Simple Interactable
+    /// Vincular al evento 'Activated' o 'First Select Entered' del XR Simple Interactable
     public void EncenderFuego()
     {
         if (encendido) return;
         encendido = true;
 
+        // 1. Encender partículas/luz del fuego
         if (fuegoEfecto != null)
             fuegoEfecto.SetActive(true);
 
+        // 2. Desaparecer el muro para dejar paso libre al amarradero
+        if (muroAmarradero != null)
+            muroAmarradero.SetActive(false);
+
+        // 3. Efectos sonoros
         if (audioSource != null)
         {
             if (sonidoEncender != null) audioSource.PlayOneShot(sonidoEncender);
             if (sonidoTerremoto != null) audioSource.PlayOneShot(sonidoTerremoto);
         }
 
+        // 4. Emerger la isla desde el agua
         if (islaEmergente != null)
         {
             StartCoroutine(EmergerIsla());

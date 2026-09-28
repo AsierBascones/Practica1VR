@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -9,6 +10,18 @@ using UnityEngine.XR.Interaction.Toolkit.Interactors;
 
 public class GameManager : MonoBehaviour
 {
+    [Serializable]
+    public class DatoPlato
+    {
+        public string nombreIdentificador;
+        [Tooltip("El pedestal/altar (GameObject en la escena)")]
+        public GameObject platoObjeto;
+        [Tooltip("El sprite representativo del objeto que debe ir aquí")]
+        public Sprite spriteObjeto;
+        [Tooltip("Nombre exacto de la Interaction Layer creada para este objeto")]
+        public string nombreInteractionLayer;
+    }
+
     [Header("Paneles UI - Isla del Juego")]
     public TextMeshProUGUI textoTiempoJuego;
     public TextMeshProUGUI textoInstruccionesJuego;
@@ -23,8 +36,11 @@ public class GameManager : MonoBehaviour
     public Image[] casillasJuego;
     [Tooltip("Iconos equivalentes del panel en el lobby (mismo orden)")]
     public Image[] casillasLobby;
-    public Color colorCasillaInactiva = new Color(1f, 1f, 1f, 0.15f);
-    public Color colorCasillaActiva = new Color(0.18f, 0.8f, 0.44f, 1f);
+
+    [Header("Colores de Estado")]
+    public Color colorCasillaInactiva = new Color(1f, 1f, 1f, 0.1f);
+    public Color colorCasillaActiva = Color.white;
+    public Color colorCasillaCompletada = new Color(0.18f, 0.8f, 0.44f, 1f);
 
     [Header("Efectos de Sonido")]
     public AudioSource audioSource;
@@ -36,15 +52,16 @@ public class GameManager : MonoBehaviour
     public float tiempoFase2 = 75f;
     public float tiempoFase3 = 90f;
 
-    [Header("Pool Total de Altares / Platos")]
-    public List<GameObject> todosLosPlatos;
+    [Header("Base de Datos de Platos y Objetos")]
+    [Tooltip("Lista con los 9 platos, sus sprites y sus Interaction Layers")]
+    public List<DatoPlato> listaPlatos = new List<DatoPlato>();
 
     [Header("Eventos de Inicio de Fase")]
     public UnityEvent OnFase1Start;
     public UnityEvent OnFase2Start;
     public UnityEvent OnFase3Start;
 
-    private List<GameObject> platosFaseActual = new List<GameObject>();
+    private List<DatoPlato> platosFaseActual = new List<DatoPlato>();
     private int faseActual = 0;
     private float tiempoRestante;
     private bool juegoActivo = false;
@@ -92,7 +109,7 @@ public class GameManager : MonoBehaviour
         {
             objetosNecesariosFase = 3;
             tiempoRestante = tiempoFase1;
-            ActualizarTextoInstrucciones("Fase 1: Coloca 3 objetos en los altares activos marcados.");
+            ActualizarTextoInstrucciones("Fase 1: Coloca los 3 objetos indicados en sus altares.");
             PrepararPlatosAleatorios(3);
             OnFase1Start?.Invoke();
         }
@@ -100,7 +117,7 @@ public class GameManager : MonoBehaviour
         {
             objetosNecesariosFase = 6;
             tiempoRestante = tiempoFase2;
-            ActualizarTextoInstrucciones("Fase 2: ¡6 objetos! Usa el teletransporte a la otra isla.");
+            ActualizarTextoInstrucciones("Fase 2: ¡6 objetos! Busca también en la otra isla.");
             PrepararPlatosAleatorios(6);
             OnFase2Start?.Invoke();
         }
@@ -108,7 +125,7 @@ public class GameManager : MonoBehaviour
         {
             objetosNecesariosFase = 9;
             tiempoRestante = tiempoFase3;
-            ActualizarTextoInstrucciones("Fase 3: ¡Completa los 9 pedestales al completo!");
+            ActualizarTextoInstrucciones("Fase 3: ¡Completa los 9 pedestales requeridos!");
             PrepararPlatosAleatorios(9);
             OnFase3Start?.Invoke();
         }
@@ -121,35 +138,46 @@ public class GameManager : MonoBehaviour
 
     private void PrepararPlatosAleatorios(int cantidad)
     {
-        foreach (var plato in todosLosPlatos)
+        // 1. Apagar todos los pedestales
+        foreach (var dp in listaPlatos)
         {
-            if (plato != null) plato.SetActive(false);
+            if (dp.platoObjeto != null) dp.platoObjeto.SetActive(false);
         }
 
         ResetearCasillas();
 
-        List<GameObject> baraja = new List<GameObject>(todosLosPlatos);
+        // 2. Barajar la lista de platos
+        List<DatoPlato> baraja = new List<DatoPlato>(listaPlatos);
         for (int i = baraja.Count - 1; i > 0; i--)
         {
-            int r = Random.Range(0, i + 1);
-            GameObject temporal = baraja[i];
+            int r = UnityEngine.Random.Range(0, i + 1);
+            DatoPlato temp = baraja[i];
             baraja[i] = baraja[r];
-            baraja[r] = temporal;
+            baraja[r] = temp;
         }
 
+        // 3. Activar los N seleccionados y preparar sus sockets y UI
         platosFaseActual.Clear();
         for (int i = 0; i < cantidad && i < baraja.Count; i++)
         {
-            GameObject platoSeleccionado = baraja[i];
-            platoSeleccionado.SetActive(true);
-            platosFaseActual.Add(platoSeleccionado);
+            DatoPlato seleccionado = baraja[i];
+            seleccionado.platoObjeto.SetActive(true);
+            platosFaseActual.Add(seleccionado);
 
-            int indicePlato = todosLosPlatos.IndexOf(platoSeleccionado);
-            ActualizarColorCasilla(indicePlato, colorCasillaActiva);
+            int indice = listaPlatos.IndexOf(seleccionado);
 
-            XRSocketInteractor socket = platoSeleccionado.GetComponentInChildren<XRSocketInteractor>();
+            // Mostrar el Sprite en ambos paneles
+            AsignarSpriteCasilla(indice, seleccionado.spriteObjeto, colorCasillaActiva);
+
+            // Configurar el socket y forzar su Interaction Layer Mask
+            XRSocketInteractor socket = seleccionado.platoObjeto.GetComponentInChildren<XRSocketInteractor>();
             if (socket != null)
             {
+                if (!string.IsNullOrEmpty(seleccionado.nombreInteractionLayer))
+                {
+                    socket.interactionLayers = InteractionLayerMask.GetMask(seleccionado.nombreInteractionLayer);
+                }
+
                 socket.selectEntered.RemoveListener(OnSocketSelectEntered);
                 socket.selectExited.RemoveListener(OnSocketSelectExited);
 
@@ -161,11 +189,11 @@ public class GameManager : MonoBehaviour
 
     private void LimpiarPlatosActivos()
     {
-        foreach (var plato in platosFaseActual)
+        foreach (var dp in platosFaseActual)
         {
-            if (plato == null) continue;
+            if (dp.platoObjeto == null) continue;
 
-            XRSocketInteractor socket = plato.GetComponentInChildren<XRSocketInteractor>();
+            XRSocketInteractor socket = dp.platoObjeto.GetComponentInChildren<XRSocketInteractor>();
             if (socket != null)
             {
                 socket.selectEntered.RemoveListener(OnSocketSelectEntered);
@@ -192,11 +220,32 @@ public class GameManager : MonoBehaviour
             audioSource.PlayOneShot(sonidoColocarObjeto);
         }
 
+        // Buscar qué plato activó el evento para marcar su casilla en verde
+        for (int i = 0; i < listaPlatos.Count; i++)
+        {
+            if (listaPlatos[i].platoObjeto != null &&
+                args.interactorObject.transform.IsChildOf(listaPlatos[i].platoObjeto.transform))
+            {
+                ActualizarColorCasilla(i, colorCasillaCompletada);
+                break;
+            }
+        }
+
         RegistrarObjetoColocado();
     }
 
     private void OnSocketSelectExited(SelectExitEventArgs args)
     {
+        for (int i = 0; i < listaPlatos.Count; i++)
+        {
+            if (listaPlatos[i].platoObjeto != null &&
+                args.interactorObject.transform.IsChildOf(listaPlatos[i].platoObjeto.transform))
+            {
+                ActualizarColorCasilla(i, colorCasillaActiva);
+                break;
+            }
+        }
+
         RegistrarObjetoRetirado();
     }
 
@@ -245,8 +294,6 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    // --- Métodos de sincronización dual ---
-
     private void ActualizarTextoTiempo(string valor)
     {
         if (textoTiempoJuego != null) textoTiempoJuego.text = valor;
@@ -266,33 +313,50 @@ public class GameManager : MonoBehaviour
 
     private void ResetearCasillas()
     {
-        if (casillasJuego != null)
+        for (int i = 0; i < casillasJuego.Length; i++)
         {
-            foreach (var c in casillasJuego)
+            if (casillasJuego[i] != null)
             {
-                if (c != null) c.color = colorCasillaInactiva;
+                casillasJuego[i].sprite = null;
+                casillasJuego[i].color = colorCasillaInactiva;
             }
         }
 
-        if (casillasLobby != null)
+        for (int i = 0; i < casillasLobby.Length; i++)
         {
-            foreach (var c in casillasLobby)
+            if (casillasLobby[i] != null)
             {
-                if (c != null) c.color = colorCasillaInactiva;
+                casillasLobby[i].sprite = null;
+                casillasLobby[i].color = colorCasillaInactiva;
             }
+        }
+    }
+
+    private void AsignarSpriteCasilla(int indice, Sprite sprite, Color color)
+    {
+        if (casillasJuego != null && indice >= 0 && indice < casillasJuego.Length && casillasJuego[indice] != null)
+        {
+            casillasJuego[indice].sprite = sprite;
+            casillasJuego[indice].color = color;
+        }
+
+        if (casillasLobby != null && indice >= 0 && indice < casillasLobby.Length && casillasLobby[indice] != null)
+        {
+            casillasLobby[indice].sprite = sprite;
+            casillasLobby[indice].color = color;
         }
     }
 
     private void ActualizarColorCasilla(int indice, Color nuevoColor)
     {
-        if (casillasJuego != null && indice >= 0 && indice < casillasJuego.Length)
+        if (casillasJuego != null && indice >= 0 && indice < casillasJuego.Length && casillasJuego[indice] != null)
         {
-            if (casillasJuego[indice] != null) casillasJuego[indice].color = nuevoColor;
+            casillasJuego[indice].color = nuevoColor;
         }
 
-        if (casillasLobby != null && indice >= 0 && indice < casillasLobby.Length)
+        if (casillasLobby != null && indice >= 0 && indice < casillasLobby.Length && casillasLobby[indice] != null)
         {
-            if (casillasLobby[indice] != null) casillasLobby[indice].color = nuevoColor;
+            casillasLobby[indice].color = nuevoColor;
         }
     }
 }
