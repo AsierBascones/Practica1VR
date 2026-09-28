@@ -18,6 +18,10 @@ public class ActivarIslaFuego : MonoBehaviour
     public float alturaVisibleY = 0f;
     public float velocidadEmerger = 3f;
 
+    [Header("Instrucciones de Teletransporte")]
+    [Tooltip("Arrastra aquí el panel/canvas con el mensaje 'Apunta a las maderas para teletransportarte'")]
+    public GameObject cartelInstruccionesTeleport;
+
     [Header("Audio")]
     public AudioSource audioSource;
     public AudioClip sonidoEncender;
@@ -30,6 +34,10 @@ public class ActivarIslaFuego : MonoBehaviour
         // Estado inicial
         if (fuegoEfecto != null) fuegoEfecto.SetActive(false);
         if (muroAmarradero != null) muroAmarradero.SetActive(true);
+
+        // Aseguramos que el cartel empiece apagado para que no flote en el aire
+        if (cartelInstruccionesTeleport != null)
+            cartelInstruccionesTeleport.SetActive(false);
 
         if (islaEmergente != null)
         {
@@ -79,5 +87,9 @@ public class ActivarIslaFuego : MonoBehaviour
         }
 
         islaEmergente.position = fin;
+
+        // 5. Al terminar de subir la isla, mostramos el cartel de teletransporte
+        if (cartelInstruccionesTeleport != null)
+            cartelInstruccionesTeleport.SetActive(true);
     }
 }
